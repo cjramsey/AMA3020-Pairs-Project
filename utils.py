@@ -1,11 +1,12 @@
 from datetime import datetime
 import os
+from time import perf_counter
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 
-def partial_derivative(func, var_index, point, h=1e-8):
+def partial_derivative(func, var_index, point, h=1e-5):
 	'''
 	Compute the partial derivative of a multivariable function at a given point using
 	2-point central difference.
@@ -186,3 +187,56 @@ def plot3d(func, x_lim, y_lim, num_points=100, alpha=0.8, cmap="viridis"):
 
 	return fig, ax
 
+
+def test_method(method, func, points, root=None):
+	'''
+	Test performance of a given optimization algorithm on a given function and specified set of points.
+	Prints the convergence rate, median iterations upon success, mean runtime upon success and 
+	percentage of failures which occurred due to singular Hessian (only applicable to variations of
+	Newton's method).
+
+	Parameters:
+		method (Callable): The algorithm being tested.
+		func (Callable): The function being tested upon.
+		points (List | np.ndarray): Set of points used to start iterations.
+		roots (List | np.ndarray): Optionally specify root to prevent silent errors.
+
+	Returns:
+		None
+	'''
+	reached_max_iter = 0
+	singular_hessian = 0
+	diverged = 0
+	success = 0
+	iterations = []
+	times = []
+
+	for point in points:
+		try:
+			start = perf_counter()
+			solution = method(func, point, history=True)
+			if root and np.linalg.norm(root - solution[-1], ord=2) > 1:
+				raise Exception
+		except StopIteration:
+			reached_max_iter += 1
+		except ValueError:
+			singular_hessian += 1
+		except Exception:
+			diverged += 1
+		else:
+			end = perf_counter()
+			times.append(end - start)
+			success += 1
+			iterations.append(len(solution) - 1)
+
+	total_failures = reached_max_iter + singular_hessian + diverged
+
+	print(method.__name__)
+	print(f"Conv. Rate: {success/len(points) * 100 if success else 0:.2f}%")
+	print(f"% failures due to singular Hessian: {singular_hessian/total_failures * 100 if total_failures > 0 else 0:.2f}")
+	print(f"Median Iterations: {np.median(iterations) if iterations else np.nan}")
+	print(f"Avg Runtime (s): {np.mean(times) if times else np.nan:.6f}") 
+
+
+if __name__ == "__main__":
+	pass
